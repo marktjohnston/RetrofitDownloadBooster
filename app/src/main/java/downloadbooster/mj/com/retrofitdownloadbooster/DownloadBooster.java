@@ -1,6 +1,7 @@
 package downloadbooster.mj.com.retrofitdownloadbooster;
 
 import android.util.Log;
+import android.util.Patterns;
 
 import java.io.File;
 import java.net.HttpURLConnection;
@@ -11,7 +12,6 @@ import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
 import retrofit2.Retrofit;
-import retrofit2.http.Field;
 import retrofit2.http.GET;
 import retrofit2.http.Header;
 import retrofit2.http.Url;
@@ -24,24 +24,36 @@ public class DownloadBooster {
 
     private final String TAG = "DOWNLOAD_BOOSTER";
     private int numberOfParts, partSize;
-    private String baseURL, fileName;
     Retrofit retrofit;
     private int fileLength;
 
-    private String fullURL = baseURL + fileName;
+    private String fullURL;
 
-    public void DownloadBooster(String baseURL,String fileName, int numberOfParts, int partSize) {
-        this.baseURL = baseURL;
-        this.fileName = fileName;
+    public  DownloadBooster(String URL, int numberOfParts, int partSize) {
         this.numberOfParts = numberOfParts;
         this.partSize = partSize;
+        this.fullURL = URL;
 
         retrofit = new Retrofit.Builder()
-                .baseUrl(baseURL)
+                .baseUrl("http://fakeurl/") //Weird limitation of retrofit that this needs set here.
                 .build();
     }
 
-    public void StartDownload(DownloadCallBack callBack) {
+    public boolean validateInput() {
+        if(partSize > 0 && numberOfParts > 0 && Patterns.WEB_URL.matcher(fullURL).matches()) {
+            return true;
+        }
+        else {
+            return false;
+        }
+    }
+
+    public void startDownload(DownloadCallBack callBack) {
+
+        if(!validateInput()) {
+            callBack.DownloadError("Invalid Input");
+            return;
+        }
 
         Downloader downloader = retrofit.create(Downloader.class);
 
@@ -72,13 +84,14 @@ public class DownloadBooster {
 
 
     public interface DownloadCallBack {
-        public void Complete(File file);
+        void DownloadComplete(File file);
+        void DownloadError(String Error);
     }
 
 
     public interface Downloader {
         @GET
-        Call<ResponseBody> GetFilePart(@Header("Range") String contentRange, @Url String URL);
+        Call<ResponseBody> GetFilePart(@Header("Range") String contentRange, @Url String fileURL);
     }
 
     public static Integer GetFileSizeFromHeader(okhttp3.Headers headers) {
@@ -102,7 +115,7 @@ public class DownloadBooster {
         return String.format("bytes=%d-%d", start, end);
     }
 
-    public void AddfileContent(Response<ResponseBody> response) {
+    public synchronized void AddfileContent(Response<ResponseBody> response) {
 
         int start = GetStartFromHeader(response.headers());
 
@@ -130,9 +143,6 @@ public class DownloadBooster {
         i = Integer.valueOf(s);
 
         return i;
-
     }
-
-
 }
 
