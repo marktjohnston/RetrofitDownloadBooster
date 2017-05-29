@@ -1,5 +1,6 @@
 package downloadbooster.mj.com.retrofitdownloadbooster;
 
+import android.support.annotation.VisibleForTesting;
 import android.util.Log;
 import android.util.Patterns;
 
@@ -31,7 +32,7 @@ public class DownloadBooster {
     private DownloadCallBack callBack;
     private static final String RANGE_HEADER = "Content-Range";
 
-    public  DownloadBooster(String URL, int numberOfParts, int partSize) {
+    public DownloadBooster(String URL, int numberOfParts, int partSize) {
         this.numberOfParts = numberOfParts;
         this.partSize = partSize;
         this.fullURL = URL;
@@ -40,6 +41,8 @@ public class DownloadBooster {
                 .baseUrl("http://fakeurl/") //Weird limitation of retrofit that this needs set here.
                 .build();
     }
+
+    public DownloadBooster() {}
 
     public boolean validateInput() {
         if(partSize > 0 && numberOfParts > 0 && Patterns.WEB_URL.matcher(fullURL).matches()) {
@@ -69,23 +72,25 @@ public class DownloadBooster {
                 @Override
                 public void onResponse(Call<ResponseBody> call, Response<ResponseBody> response) {
 
+                    responses++;
                     if (response.isSuccessful() && response.code() == HttpURLConnection.HTTP_PARTIAL) {
                         AddFileContent(response);
-                        Log.d(TAG, "Happy Days");
+                    }
+                    else if(response.code() == HttpURLConnection.HTTP_NOT_ACCEPTABLE) {
+                        //TODO: File is smaller than the range we are trying to get.
+                        // We could figure out the correct range to get the last part of the file.
+
                     }
 
                 }
 
                 @Override
                 public void onFailure(Call<ResponseBody> call, Throwable t) {
-                    Log.e(TAG, "error");
+                    responses++;
                 }
             });
         }
-
     }
-
-
 
     public interface DownloadCallBack {
         void DownloadComplete(byte[] file);
@@ -98,19 +103,16 @@ public class DownloadBooster {
         Call<ResponseBody> GetFilePart(@Header("Range") String contentRange, @Url String fileURL);
     }
 
-    public static Integer GetFileSizeFromHeader(okhttp3.Headers headers) {
-        int i;
-
+    private int GetFileSizeFromHeader(okhttp3.Headers headers) {
         String range = headers.get(RANGE_HEADER);
         String s = range.substring(range.lastIndexOf("/") + 1);
 
-        i = Integer.valueOf(s);
-
-        return i;
+        return Integer.valueOf(s);
 
     }
 
-    public static String GetRangeHeaderValue(int numberOfParts, int sizeOfPart) {
+    @VisibleForTesting
+    protected String GetRangeHeaderValue(int numberOfParts, int sizeOfPart) {
         int start,end;
 
         start = numberOfParts * sizeOfPart;
@@ -119,9 +121,8 @@ public class DownloadBooster {
         return String.format("bytes=%d-%d", start, end);
     }
 
-    public synchronized void AddFileContent(Response<ResponseBody> response) {
+    private synchronized void AddFileContent(Response<ResponseBody> response) {
 
-        responses++;
         int start = GetStartFromHeader(response.headers());
         int end = GetEndFromHeader(response.headers());
 
@@ -147,30 +148,21 @@ public class DownloadBooster {
         if(responses >= numberOfParts) {
             callBack.DownloadComplete(fileBytes);
         }
-
-
     }
 
 
-    public static int GetStartFromHeader(Headers headers) {
-        int i;
+    protected int GetStartFromHeader(Headers headers) {
         String range = headers.get(RANGE_HEADER);
         String s = range.substring(range.indexOf(" ") + 1, range.lastIndexOf("-"));
 
-        i = Integer.valueOf(s);
-
-        return i;
+        return Integer.valueOf(s);
     }
 
-    public static int GetEndFromHeader(Headers headers) {
-
-        int i;
+    protected int GetEndFromHeader(Headers headers) {
         String range = headers.get(RANGE_HEADER);
         String s = range.substring(range.indexOf("-") + 1, range.lastIndexOf("/"));
 
-        i = Integer.valueOf(s);
-
-        return i;
+        return Integer.valueOf(s);
     }
 }
 

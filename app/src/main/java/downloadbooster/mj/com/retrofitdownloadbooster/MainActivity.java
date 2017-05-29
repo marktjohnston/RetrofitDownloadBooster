@@ -34,7 +34,7 @@ public class MainActivity extends AppCompatActivity implements DownloadBooster.D
             @Override
             public void onClick(View v) {
 
-                String URL = editFullURL.getText().toString().isEmpty() ? "http://code.jquery.com/jquery-1.11.3.js" : editFullURL.getText().toString();
+                String URL = editFullURL.getText().toString().isEmpty() ? "http://code.jquery.com/jquery-1.11.3.min.js" : editFullURL.getText().toString();
                 int numberOfParts = editNumberOfParts.getText().toString().isEmpty() ? 1 : Integer.parseInt(editNumberOfParts.getText().toString());
                 int sizeOfParts = editSizeOfParts.getText().toString().isEmpty() ? 1 : Integer.parseInt(editSizeOfParts.getText().toString());
                 DownloadBooster db = new DownloadBooster(URL, numberOfParts, sizeOfParts);
@@ -49,7 +49,7 @@ public class MainActivity extends AppCompatActivity implements DownloadBooster.D
     @Override
     public void DownloadComplete(byte[] bytes) {
 
-        String outputFileName = this.getCacheDir() + "testfile";
+        String outputFileName = this.getCacheDir() + "/testfile";
 
         try {
             BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(outputFileName));
