@@ -2,12 +2,16 @@ package downloadbooster.mj.com.retrofitdownloadbooster;
 
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ExpandableListView;
 import android.widget.TextView;
 
+import java.io.BufferedOutputStream;
 import java.io.File;
+import java.io.FileOutputStream;
 
 public class MainActivity extends AppCompatActivity implements DownloadBooster.DownloadCallBack {
 
@@ -43,8 +47,20 @@ public class MainActivity extends AppCompatActivity implements DownloadBooster.D
 
 
     @Override
-    public void DownloadComplete(File file) {
+    public void DownloadComplete(byte[] bytes) {
 
+        String outputFileName = this.getCacheDir() + "testfile";
+
+        try {
+            BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(outputFileName));
+            bos.write(bytes);
+            bos.flush();
+            bos.close();
+
+        }
+        catch(Exception e) {
+            Log.e("MainActivity", "Unable to write to file");
+        }
     }
 
     @Override

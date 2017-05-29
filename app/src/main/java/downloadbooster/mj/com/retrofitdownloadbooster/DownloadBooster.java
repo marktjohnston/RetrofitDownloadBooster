@@ -3,7 +3,7 @@ package downloadbooster.mj.com.retrofitdownloadbooster;
 import android.util.Log;
 import android.util.Patterns;
 
-import java.io.File;
+import java.io.IOException;
 import java.net.HttpURLConnection;
 
 import okhttp3.Headers;
@@ -25,9 +25,11 @@ public class DownloadBooster {
     private final String TAG = "DOWNLOAD_BOOSTER";
     private int numberOfParts, partSize;
     Retrofit retrofit;
-    private int fileLength;
-
+    byte[] fileBytes;
+    int responses = 0;
     private String fullURL;
+    private DownloadCallBack callBack;
+    private static final String RANGE_HEADER = "Content-Range";
 
     public  DownloadBooster(String URL, int numberOfParts, int partSize) {
         this.numberOfParts = numberOfParts;
@@ -55,6 +57,8 @@ public class DownloadBooster {
             return;
         }
 
+        this.callBack = callBack;
+
         Downloader downloader = retrofit.create(Downloader.class);
 
         for (int i=0; i < numberOfParts; i++) {
@@ -66,7 +70,7 @@ public class DownloadBooster {
                 public void onResponse(Call<ResponseBody> call, Response<ResponseBody> response) {
 
                     if (response.isSuccessful() && response.code() == HttpURLConnection.HTTP_PARTIAL) {
-                        //fileLength = GetFileSizeFromHeader(response.headers());
+                        AddFileContent(response);
                         Log.d(TAG, "Happy Days");
                     }
 
@@ -84,7 +88,7 @@ public class DownloadBooster {
 
 
     public interface DownloadCallBack {
-        void DownloadComplete(File file);
+        void DownloadComplete(byte[] file);
         void DownloadError(String Error);
     }
 
@@ -96,7 +100,7 @@ public class DownloadBooster {
 
     public static Integer GetFileSizeFromHeader(okhttp3.Headers headers) {
         int i;
-        String RANGE_HEADER = "Content-Range";
+
         String range = headers.get(RANGE_HEADER);
         String s = range.substring(range.lastIndexOf("/") + 1);
 
@@ -115,18 +119,43 @@ public class DownloadBooster {
         return String.format("bytes=%d-%d", start, end);
     }
 
-    public synchronized void AddfileContent(Response<ResponseBody> response) {
+    public synchronized void AddFileContent(Response<ResponseBody> response) {
 
+        responses++;
         int start = GetStartFromHeader(response.headers());
+        int end = GetEndFromHeader(response.headers());
+
+        if(fileBytes == null) {
+            int totalFileSize = GetFileSizeFromHeader(response.headers());
+            int requestSize = numberOfParts * partSize;
+            int actualSize = totalFileSize < requestSize ? totalFileSize : requestSize;
+
+            fileBytes = new byte[actualSize];
+        }
+        int i=0;
+        while(start < end) {
+
+            try {
+                fileBytes[start] = response.body().bytes()[i];
+            }
+            catch (IOException e) {
+                Log.e(TAG, e.getMessage());
+            }
+            start++;
+            i++;
+        }
+        if(responses >= numberOfParts) {
+            callBack.DownloadComplete(fileBytes);
+        }
+
 
     }
 
 
     public static int GetStartFromHeader(Headers headers) {
         int i;
-        String RANGE_HEADER = "Content-Range";
         String range = headers.get(RANGE_HEADER);
-        String s = range.substring(range.indexOf(" ") + 1, range.lastIndexOf("/"));
+        String s = range.substring(range.indexOf(" ") + 1, range.lastIndexOf("-"));
 
         i = Integer.valueOf(s);
 
@@ -136,9 +165,8 @@ public class DownloadBooster {
     public static int GetEndFromHeader(Headers headers) {
 
         int i;
-        String RANGE_HEADER = "Content-Range";
         String range = headers.get(RANGE_HEADER);
-        String s = range.substring(range.indexOf(" ") + 1, range.lastIndexOf("/"));
+        String s = range.substring(range.indexOf("-") + 1, range.lastIndexOf("/"));
 
         i = Integer.valueOf(s);
 
